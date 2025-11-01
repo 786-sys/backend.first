@@ -13,8 +13,11 @@ app.use(express.json())
 
 app.use(cookie())
 app.use(cors({
-    origin: "http://localhost:5173", // your React app URL
-    credentials: true
+
+    origin: [
+        "https://your-frontend-app.netlify.app",
+        "http://localhost:5173" ],
+        credentials: true
 }));
 
 Main().catch(err => console.log(err))
@@ -86,7 +89,7 @@ app.post('/user/signin', async (req, res) => {
 })
 app.post('/logout', verifyjwt, async (req, res) => {
     console.log(req.user)
-    const user=await usermodel.findById(req.user)
+    const user = await usermodel.findById(req.user)
     if (!user) {
         return res.status(401).json({ message: "unauthorized user " })
     }
@@ -129,10 +132,10 @@ app.post('/submit', verifyjwt, async (req, res) => {
         //         pass: [...arr]
         //     }
         // })
-        
-        let passArray=reqUser.pass
-        passArray=[...passArray,arr]
-        reqUser.pass=passArray
+
+        let passArray = reqUser.pass
+        passArray = [...passArray, arr]
+        reqUser.pass = passArray
         console.log(reqUser.pass)
         await reqUser.save({ validateBeforeSave: false })
     } catch (ERR) {
@@ -154,10 +157,10 @@ app.delete('/delete', verifyjwt, async (req, res) => {
     array = array.filter((obj) => {
         return obj.username !== username
     })
-    user.pass=array
+    user.pass = array
     await user.save({ validateBeforeSave: false })
     console.log("Deleted ")
-    res.json({message:"deleted that particular row "})
+    res.json({ message: "deleted that particular row " })
 })
 
 app.delete('/alldelete', verifyjwt, async (req, res) => {
@@ -166,12 +169,12 @@ app.delete('/alldelete', verifyjwt, async (req, res) => {
     if (!user) {
         return res.status(401).json({ message: "unauthorized user " })
     }
-    let array=user.pass
-    array=[]
-    user.pass=array
+    let array = user.pass
+    array = []
+    user.pass = array
     await user.save({ validateBeforeSave: false })
-    res.status(200).json({message:"Deleted all the websites passwrods"})
-    
+    res.status(200).json({ message: "Deleted all the websites passwrods" })
+
 })
 
 app.get('/display', verifyjwt, async (req, res) => {
@@ -185,6 +188,6 @@ app.get('/display', verifyjwt, async (req, res) => {
     console.log(alldata)
     res.json({ data: alldata })
 })
-app.listen(port, () => {
-    console.log(`http://localhost:${port}`)
-})
+// app.listen(port, () => {
+//     console.log(`http://localhost:${port}`)
+// })
