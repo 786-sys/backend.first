@@ -4,6 +4,7 @@ const cors = require('cors')
 const dotenv = require('dotenv')
 const usermodel = require('./user.model.js')
 const cookie = require('cookie-parser')
+const {GoogleGenAI}=require('@google/genai')
 const verifyjwt = require('./middleware/auth.middleware.js')
 const port = 5071
 const app = express()
@@ -15,7 +16,7 @@ app.use(cookie())
 app.use(cors({
 
     origin: [
-        "https://your-frontend-app.netlify.app",
+        "https://passo-manocharge.netlify.app/Sign_Up", // ✅ your Netlify frontend
         "http://localhost:5173" ],
         credentials: true
 }));
@@ -60,6 +61,7 @@ const generateaccessrefreshtoken = async (id) => {
 
 app.post('/user/signin', async (req, res) => {
     const { user, password } = req.body
+    console.log(user +" "+password)
     if (!user || !password) {
         res.status(401).json({ error: "Filled both the field" })
     }
@@ -67,6 +69,7 @@ app.post('/user/signin', async (req, res) => {
     if (!userExist) {
         return res.status(400).json({ message: "User Dont exist , register first " })
     }
+    console.log(userExist)
     const iscorrectpassword = await userExist.ispasswordcorrect(password)
 
     if (!iscorrectpassword) {
@@ -144,7 +147,83 @@ app.post('/submit', verifyjwt, async (req, res) => {
     }
     res.json({ mess: "your data has been saved in Database" })
 })
+app.post('/getanswer', verifyjwt, async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "unauthorized user" });
+  
+    const user = await usermodel.findById(req.user.id);
+    if (!user) return res.status(401).json({ message: "unauthorized user" });
+    const auth=user.user
+    const prompt = req.body.prompt;
+    const prev_chats = user.chats.slice(-50).map(item => `prev_prompt: ${item.ques}\nprev_response: ${item.ans}`).join("\n");
+    let info = user.pass.map(item => `web: ${item.web}, username: ${item.username}, password: ${item.password}`).join("\n");
+    if(info.trim()===""){
+        info="no passwords and username"
+    }
+  
+    const systempro = `You are an advanced conversational AI assistant modeled after ChatGPT-5. Follow instructions carefully...`;
+    console.log(info)
+    console.log(auth)
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.my_key_api });
+  
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `${systempro}\n\nPrevious conversation:\n${prev_chats}\n\n
+        Master username : ${auth}
+        \n
+        User info :\n${"*"+info}\n\nNew prompt:\n${prompt}`,
+        temperature: 0.3,
+        max_output_tokens: 500
+      });
+  
+      const meaning = response.text || "No answer found.";
+      
+      // Save conversation
+      user.chats.push({ ques: prompt, ans: meaning });
+      await user.save();
+  
+      return res.json({ message: meaning });
+  
+    } catch (err) {
+      console.error("🔥 Gemini API Error:", err);
+      return res.status(500).json({ error: "Error contacting Gemini API" });
+    }
+  });
+  
+  
+  
+app.get('/getprofile',verifyjwt,async(req,res)=>{
+    if (!req.user) {
+        return res.status(401).json({ message: "unauthorized user " })
+    }
+    const user=await usermodel.findById(req.user?.id)
+    let username=user.user
+    let email=username+"@gmail.com"
+    try {
+        // Get public IP
+        const ipRes = await fetch("https://api.ipify.org?format=json");
+        const ipData = await ipRes.json();
+        const ip = ipData.ip;
+    
+        // Get geolocation info
+        const locRes = await fetch(`https://ipapi.co/${ip}/json/`);
+        const data = await locRes.json();
+    
+        console.log("======================================");
+        console.log("🌍 LIVE Server Location (IP-based)");
+        console.log("--------------------------------------");
+        console.log("📍 IP Address:", ip);
+        console.log("🏙️ City:", data.city);
+        console.log("🌆 Region/State:", data.region);
+        console.log("🇮🇳 Country:", data.country_name);
+        console.log("🗺️ Coordinates:", data.latitude, ",", data.longitude);
+        console.log("======================================\n");
+      } catch (error) {
+        console.error("❌ Error detecting location:", error.message);
+      }
+    return res.json({username,email})
 
+})
 app.delete('/delete', verifyjwt, async (req, res) => {
     console.log(req.user)
     if (!req.user) {
@@ -188,6 +267,6 @@ app.get('/display', verifyjwt, async (req, res) => {
     console.log(alldata)
     res.json({ data: alldata })
 })
-// app.listen(port, () => {
-//     console.log(`http://localhost:${port}`)
-// })
+app.listen(port, () => {
+    console.log(`http://localhost:${port}`)
+})

@@ -17,6 +17,10 @@ const userSchema = mongoose.Schema({
         username: { type: String },
         password: { type: String }
     }],
+    chats:[{
+        ques:{type:String},
+        ans:{type:String}
+    }],
     refreshToken:{
         type:String
     }
