@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaskFlow – Smart Todo</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --card: rgba(255, 255, 255, 0.08);
+        --card-border: rgba(255, 255, 255, 0.15);
+        --text: #edf2ff;
+        --muted: #9aa6c7;
+        --accent: #6d7dff;
+        --accent-2: #48d6ff;
+        --danger: #ff5b7f;
+        --ok: #4ade80;
+        --shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+          Helvetica, Arial, sans-serif;
+        color: var(--text);
+        min-height: 100vh;
+        background: radial-gradient(circle at 10% 20%, #1d2752 0%, transparent 40%),
+          radial-gradient(circle at 80% 0%, #17315f 0%, transparent 35%), var(--bg);
+        display: grid;
+        place-items: center;
+        padding: 1.5rem;
+      }
+
+      .app {
+        width: min(720px, 100%);
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        box-shadow: var(--shadow);
+        border-radius: 24px;
+        backdrop-filter: blur(10px);
+        overflow: hidden;
+      }
+
+      .header {
+        padding: 1.6rem 1.6rem 1rem;
+      }
+
+      .header h1 {
+        margin: 0;
+        font-size: clamp(1.5rem, 2.8vw, 2.1rem);
+      }
+
+      .header p {
+        color: var(--muted);
+        margin-top: 0.45rem;
+        margin-bottom: 0;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.8rem;
+        margin-top: 1rem;
+      }
+
+      input,
+      button,
+      select {
+        font: inherit;
+      }
+
+      .task-input,
+      .filter {
+        width: 100%;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        background: rgba(8, 13, 30, 0.6);
+        color: var(--text);
+        padding: 0.8rem 0.9rem;
+      }
+
+      .add-btn {
+        border: none;
+        border-radius: 12px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: white;
+        padding: 0.8rem 1rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.8rem;
+        margin-top: 0.9rem;
+      }
+
+      .stats {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .list {
+        list-style: none;
+        padding: 0.5rem 1.2rem 1.2rem;
+        margin: 0;
+        display: grid;
+        gap: 0.7rem;
+      }
+
+      .item {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 0.8rem;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 14px;
+        padding: 0.72rem 0.8rem;
+      }
+
+      .item.done .label {
+        text-decoration: line-through;
+        color: var(--muted);
+      }
+
+      .checkbox {
+        width: 20px;
+        height: 20px;
+        accent-color: var(--ok);
+      }
+
+      .label {
+        word-break: break-word;
+      }
+
+      .delete {
+        border: none;
+        background: transparent;
+        color: var(--danger);
+        cursor: pointer;
+        font-size: 1.2rem;
+        line-height: 1;
+        padding: 0.15rem 0.35rem;
+      }
+
+      .empty {
+        text-align: center;
+        color: var(--muted);
+        padding: 1.2rem;
+      }
+
+      @media (max-width: 560px) {
+        .controls {
+          grid-template-columns: 1fr;
+        }
+
+        .toolbar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <section class="header">
+        <h1>✨ TaskFlow</h1>
+        <p>Simple, stylish, and interactive todo page using pure HTML, CSS & JavaScript.</p>
+
+        <div class="controls">
+          <input
+            id="taskInput"
+            class="task-input"
+            type="text"
+            placeholder="Write a task and hit Add..."
+            maxlength="120"
+          />
+          <button id="addBtn" class="add-btn">Add Task</button>
+        </div>
+
+        <div class="toolbar">
+          <select id="filter" class="filter" aria-label="Filter tasks">
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="done">Completed</option>
+          </select>
+          <div class="stats" id="stats">0 task(s)</div>
+        </div>
+      </section>
+
+      <ul id="taskList" class="list"></ul>
+      <p id="empty" class="empty">No tasks yet. Start by adding one above 👆</p>
+    </main>
+
+    <script>
+      const STORAGE_KEY = 'taskflow.tasks.v1';
+      const input = document.getElementById('taskInput');
+      const addBtn = document.getElementById('addBtn');
+      const list = document.getElementById('taskList');
+      const empty = document.getElementById('empty');
+      const stats = document.getElementById('stats');
+      const filter = document.getElementById('filter');
+
+      let tasks = loadTasks();
+
+      function loadTasks() {
+        try {
+          return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        } catch {
+          return [];
+        }
+      }
+
+      function saveTasks() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+      }
+
+      function addTask() {
+        const text = input.value.trim();
+        if (!text) return;
+
+        tasks.unshift({ id: crypto.randomUUID(), text, done: false });
+        input.value = '';
+        saveTasks();
+        render();
+        input.focus();
+      }
+
+      function deleteTask(id) {
+        tasks = tasks.filter((task) => task.id !== id);
+        saveTasks();
+        render();
+      }
+
+      function toggleTask(id) {
+        tasks = tasks.map((task) =>
+          task.id === id ? { ...task, done: !task.done } : task
+        );
+        saveTasks();
+        render();
+      }
+
+      function filteredTasks() {
+        if (filter.value === 'active') return tasks.filter((task) => !task.done);
+        if (filter.value === 'done') return tasks.filter((task) => task.done);
+        return tasks;
+      }
+
+      function render() {
+        const visible = filteredTasks();
+        list.innerHTML = '';
+
+        visible.forEach((task) => {
+          const li = document.createElement('li');
+          li.className = `item ${task.done ? 'done' : ''}`;
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.className = 'checkbox';
+          checkbox.checked = task.done;
+          checkbox.addEventListener('change', () => toggleTask(task.id));
+
+          const label = document.createElement('span');
+          label.className = 'label';
+          label.textContent = task.text;
+
+          const del = document.createElement('button');
+          del.className = 'delete';
+          del.setAttribute('aria-label', `Delete ${task.text}`);
+          del.innerHTML = '&times;';
+          del.addEventListener('click', () => deleteTask(task.id));
+
+          li.append(checkbox, label, del);
+          list.appendChild(li);
+        });
+
+        const activeCount = tasks.filter((task) => !task.done).length;
+        stats.textContent = `${tasks.length} total • ${activeCount} active`;
+        empty.style.display = visible.length ? 'none' : 'block';
+      }
+
+      addBtn.addEventListener('click', addTask);
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') addTask();
+      });
+      filter.addEventListener('change', render);
+
+      render();
+    </script>
+  </body>
+</html>
